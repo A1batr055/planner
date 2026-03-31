@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>考研周计划</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{--bg:#f1f5f9;--bg2:#e8ecf2;--card:#fff;--card2:#fafcff;--text:#1e293b;--text2:#334155;--text3:#64748b;--text4:#94a3b8;--border:#e2e8f0;--border2:#e8ecf2;--header-bg:linear-gradient(135deg,#1e293b,#334155);--header-text:#fff;--modal-bg:rgba(0,0,0,0.35);--input-bg:#fff;--green:#34d399;--blue:#3b82f6;--red:#ef4444;--orange:#f97316;--font:'Noto Sans SC','SF Pro Display',-apple-system,sans-serif;--mono:'JetBrains Mono',monospace}
+[data-theme="dark"]{--bg:#0f172a;--bg2:#1e293b;--card:#1e293b;--card2:#263548;--text:#e2e8f0;--text2:#cbd5e1;--text3:#94a3b8;--text4:#64748b;--border:#334155;--border2:#334155;--header-bg:linear-gradient(135deg,#0f172a,#1e293b);--header-text:#e2e8f0;--input-bg:#334155}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:72px}
+button{font-family:var(--font)}
+button:active{transform:scale(0.97)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--border);z-index:900;padding:4px 0 env(safe-area-inset-bottom)}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0;background:none;border:none;font-size:10px;font-weight:600;color:var(--text4);cursor:pointer}
+.tab-btn.active{color:var(--blue)}
+.tab-icon{font-size:20px}
+.overlay{position:fixed;inset:0;z-index:1000;background:var(--modal-bg);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .15s ease}
+.sheet{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:24px 20px 32px;box-shadow:0 -8px 40px rgba(0,0,0,.12);animation:slideUp .2s ease;max-height:85vh;overflow-y:auto}
+.sheet-title{font-weight:700;font-size:17px;color:var(--text)}
+input,textarea,select{font-family:var(--font);width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;outline:none;background:var(--input-bg);color:var(--text);transition:border .15s}
+input:focus,textarea:focus{border-color:var(--blue)}
+textarea{resize:vertical}
+.label{display:block;font-size:12px;font-weight:600;color:var(--text3);margin:10px 0 4px;letter-spacing:.04em}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;letter-spacing:.02em}
+.pill-sm{padding:1px 8px;font-size:11px}
+.btn-primary{width:100%;padding:12px;border-radius:12px;border:none;background:var(--text);color:var(--header-text);font-weight:700;font-size:15px;cursor:pointer}
+.btn-sm{padding:8px 18px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);color:var(--text4);font-size:12px;font-weight:600;cursor:pointer}
+.btn-danger{border-color:#fecaca;color:#dc2626;background:#fff5f5}
+.deadline-warn{border-left:3px solid var(--orange)!important}
+.deadline-overdue{border-left:3px solid var(--red)!important}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef,useMemo}=React;
+
+// ═══ DEFAULT DATA ═══
+const DEFAULT_SUBJECTS={"口译":{bg:"#fef3c7",text:"#92400e",border:"#fbbf24"},"翻硕英语":{bg:"#dbeafe",text:"#1e40af",border:"#60a5fa"},"翻译基础":{bg:"#fce7f3",text:"#9d174d",border:"#f472b6"},"百科":{bg:"#d1fae5",text:"#065f46",border:"#34d399"},"作业":{bg:"#f3e8ff",text:"#6b21a8",border:"#a78bfa"},"回顾":{bg:"#e0e7ff",text:"#3730a3",border:"#818cf8"},"全天":{bg:"#f1f5f9",text:"#475569",border:"#94a3b8"}};
+
+const DAYS=["周一","周二","周三","周四","周五","周六","周日"];
+
+const WEEK4={
+  id:"w4",title:"WEEK 4 双周",dateRange:"3.30 周一 — 4.5 周日",startDate:"2026-03-30",
+  note:"双周 = 精读外刊(周四) · 复习词条(周日) · 典籍英译pre(4/8)本周准备",
+  allDayTasks:[{id:"ad1",text:"专八词汇",subject:"全天",doneDays:[false,false,false,false,false,false,false]}],
+  days:[
+    {label:"周一 3/30",classInfo:"10:30高级英语 · 19:30影视翻译",notes:"",tasks:[
+      {id:"t1",time:"晚上",subject:"作业",text:"高英圣诞致辞 听2篇+记笔记+总结主题词（5/8交，共6篇）",done:false,deadline:"2026-05-08"}
+    ]},
+    {label:"周二 3/31",classInfo:"08:30高级英语 · 下午自习室(出声)",notes:"",tasks:[
+      {id:"t2",time:"14:00",subject:"口译",text:"影子跟读 + 交传模拟 — VOA跟读30min → 选1段交传（录音回听）",done:false},
+      {id:"t3",time:"晚上",subject:"翻硕英语",text:"精读 Scientific American 1篇（科技方向）— 查词+摘5个好表达+写100词summary",done:false}
+    ]},
+    {label:"周三 4/1",classInfo:"10:30专题口译 · 14:30典籍英译 · 典籍作业布置",notes:"",tasks:[
+      {id:"t4",time:"课后",subject:"口译",text:"复盘专题口译课 — 整理术语（中英对照）→ 术语表",done:false},
+      {id:"t5",time:"晚上",subject:"百科",text:"读《文化要略》第3章 — 边读边标关键概念，读完复述5个核心点",done:false}
+    ]},
+    {label:"周四 4/2",classInfo:"10:30笔译工作坊 · 14:00-17:00自习室 · 19:30翻译技术",notes:"",tasks:[
+      {id:"t6",time:"14:00",subject:"翻译基础",text:"汉译英：张培基散文选 第3篇 — 限时90min手写→对照参考译文自改",done:false},
+      {id:"t7",time:"15:30",subject:"作业",text:"典籍英译作业 — 周三布置，周五晚交",done:false,deadline:"2026-04-03"}
+    ]},
+    {label:"周五 4/3",classInfo:"08:30英语研究方法 · 典籍作业交",notes:"",tasks:[
+      {id:"t8",time:"13:00",subject:"作业",text:"典籍英译presentation准备 — 选段+翻译+理思路（4/8上台）",done:false,deadline:"2026-04-08"}
+    ]},
+    {label:"周六 4/4",classInfo:"下午休息",notes:"",tasks:[
+      {id:"t9",time:"上午",subject:"翻硕英语",text:"复习周二外刊笔记 — 5个好表达抄到表达本，各造1个例句 30min",done:false},
+      {id:"t10",time:"上午",subject:"作业",text:"专八改错 + 专八阅读 — 今晚前交",done:false,deadline:"2026-04-04"}
+    ]},
+    {label:"周日 4/5",classInfo:"上午休息",notes:"",tasks:[
+      {id:"t11",time:"下午",subject:"百科",text:"【双周】复习词条 — 翻表达本+百科笔记，自测一轮",done:false},
+      {id:"t12",time:"下午",subject:"回顾",text:"本周回顾（最多1h）— 写3句：学了啥/卡哪了/下周重点",done:false}
+    ]}
+  ]
+};
+
+const GOALS=[
+  {title:"翻译硕士英语",score:"100分",items:["大阅读1篇(1500-3500词)+3-5道简答","英文作文400词(AI伦理/宗教/数字人文等)","防名词解释题回归(跟中国日报双语热词)"],notes:""},
+  {title:"翻译基础综合",score:"150分",items:["汉译英(古典概念+现代评述混搭)","编译题(2000字中文→500词英文)","编译≠逐句翻，审题看语体/受众要求"],notes:""},
+  {title:"百科知识",score:"150分",items:["题型极不固定：名解/语句解释/选择/作文","2025新增30道选择题","广撒网，不能只背一个方向"],notes:""},
+  {title:"复试",score:"占50%",items:["无笔记听译(1.5-3min音频)","英汉各一段","可能考视译"],notes:""},
+  {title:"政治",score:"100分",items:["统考，7月再开始","马原→毛中特→史纲→思修+形策"],notes:""}
+];
+
+// ═══ STORAGE ═══
+const STORAGE_KEY="mti-planner-data";
+function loadData(){
+  try{
+    const d=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(d&&d.weeks){
+      const cw=findCurrentWeek(d.weeks,d.weekOrder);
+      if(cw)d.currentWeekId=cw;
+      return d;
+    }
+  }catch{}
+  return{weeks:{w4:WEEK4},weekOrder:["w4"],currentWeekId:"w4",settings:{darkMode:false,subjects:{...DEFAULT_SUBJECTS}},goals:GOALS.map(g=>({...g}))};
+}
+function saveData(data){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch{}}
+function genId(){return"t"+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+
+// Date helpers
+function getTodayIdx(startDate){
+  if(!startDate)return-1;
+  const start=new Date(startDate+"T00:00:00");
+  const now=new Date();now.setHours(0,0,0,0);
+  const diff=Math.round((now-start)/86400000);
+  if(diff>=0&&diff<7)return diff;
+  return-1;
+}
+function findCurrentWeek(weeks,weekOrder){
+  for(const wid of weekOrder){
+    const w=weeks[wid];
+    if(w.startDate&&getTodayIdx(w.startDate)>=0)return wid;
+  }
+  return null;
+}
+
+// ═══ SMALL COMPONENTS ═══
+function Pill({subject,subjects,small}){
+  const c=subjects[subject]||subjects["全天"]||{bg:"#f1f5f9",text:"#475569",border:"#94a3b8"};
+  return <span className={small?"pill pill-sm":"pill"} style={{background:c.bg,color:c.text,border:`1.5px solid ${c.border}`}}>{subject}</span>;
+}
+
+function DeadlineTag({deadline}){
+  if(!deadline)return null;
+  const now=new Date();now.setHours(0,0,0,0);
+  const dl=new Date(deadline+"T00:00:00");
+  const diff=Math.ceil((dl-now)/(86400000));
+  if(diff<0)return <span style={{fontSize:11,color:"var(--red)",fontWeight:700}}>已过期</span>;
+  if(diff<=2)return <span style={{fontSize:11,color:"var(--orange)",fontWeight:700}}>{diff===0?"今天截止":`还剩${diff}天`}</span>;
+  if(diff<=7)return <span style={{fontSize:11,color:"var(--text4)",fontWeight:500}}>{dl.getMonth()+1}/{dl.getDate()}截止</span>;
+  return null;
+}
+
+function deadlineClass(deadline,done){
+  if(!deadline||done)return"";
+  const now=new Date();now.setHours(0,0,0,0);
+  const dl=new Date(deadline+"T00:00:00");
+  const diff=Math.ceil((dl-now)/86400000);
+  if(diff<0)return"deadline-overdue";
+  if(diff<=2)return"deadline-warn";
+  return"";
+}
+
+// ═══ TASK MODAL ═══
+function TaskModal({task,dayIdx,days,subjects,onSave,onDelete,onMove,onClose}){
+  const[time,setTime]=useState(task?.time||"");
+  const[subject,setSubject]=useState(task?.subject||"口译");
+  const[text,setText]=useState(task?.text||"");
+  const[deadline,setDeadline]=useState(task?.deadline||"");
+  const isNew=!task?.id;
+  const subjectKeys=Object.keys(subjects).filter(s=>s!=="全天");
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <span className="sheet-title">{isNew?"添加任务":"编辑任务"}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"var(--text4)"}}>×</button>
+        </div>
+        <label className="label">时间</label>
+        <input value={time} onChange={e=>setTime(e.target.value)} placeholder="如：14:00 / 上午 / 晚上"/>
+        <label className="label">科目</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+          {subjectKeys.map(s=>{const c=subjects[s];return(
+            <button key={s} onClick={()=>setSubject(s)} style={{padding:"4px 14px",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",
+              border:subject===s?`2px solid ${c.border}`:"2px solid var(--border)",
+              background:subject===s?c.bg:"var(--card)",color:subject===s?c.text:"var(--text4)",transition:"all .15s"}}>{s}</button>
+          )})}
+        </div>
+        <label className="label">任务内容</label>
+        <textarea value={text} onChange={e=>setText(e.target.value)} rows={3} placeholder="做什么 + 具体要求" style={{minHeight:70}}/>
+        <label className="label">截止日期（选填）</label>
+        <input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)}/>
+        {!isNew&&dayIdx>=0&&days&&(
+          <>
+            <label className="label">移动到</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {days.map((d,i)=>i!==dayIdx&&(
+                <button key={i} onClick={()=>{onMove(dayIdx,i,task.id);onClose()}} className="btn-sm" style={{fontSize:11}}>{d.label.split(" ")[0]}</button>
+              ))}
+            </div>
+          </>
+        )}
+        <div style={{display:"flex",gap:10,marginTop:18}}>
+          {!isNew&&onDelete&&<button onClick={()=>{onDelete(task.id);onClose()}} className="btn-sm btn-danger">删除</button>}
+          <button onClick={()=>{if(!text.trim())return;onSave({id:task?.id||genId(),time,subject,text,done:task?.done||false,deadline:deadline||undefined});onClose()}} className="btn-primary">{isNew?"添加":"保存"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ PLAN TAB ═══
+function PlanTab({data,setData}){
+  const week=data.weeks[data.currentWeekId];
+  const subjects=data.settings.subjects;
+  const[expanded,setExpanded]=useState({});
+  const[editing,setEditing]=useState(null);
+  const[editHeader,setEditHeader]=useState(false);
+  const titleRef=useRef();const noteRef=useRef();const startDateRef=useRef();
+
+  const todayIdx=getTodayIdx(week.startDate);
+
+  useEffect(()=>{if(todayIdx>=0)setExpanded(prev=>({...prev,[todayIdx]:true}))},[data.currentWeekId]);
+
+  const update=(fn)=>{setData(prev=>{const next=JSON.parse(JSON.stringify(prev));fn(next.weeks[next.currentWeekId]);return next})};
+
+  const toggleDone=(dayIdx,taskId,dotIdx)=>{
+    update(w=>{
+      if(dayIdx===-1){const t=w.allDayTasks.find(x=>x.id===taskId);if(t){if(!t.doneDays)t.doneDays=Array(7).fill(false);t.doneDays[dotIdx]=!t.doneDays[dotIdx]}}
+      else{const t=w.days[dayIdx].tasks.find(x=>x.id===taskId);if(t)t.done=!t.done}
+    })};
+  const saveTask=(dayIdx,task)=>{
+    update(w=>{
+      if(dayIdx===-1){const i=w.allDayTasks.findIndex(x=>x.id===task.id);if(i>=0){w.allDayTasks[i]={...task,doneDays:w.allDayTasks[i].doneDays||Array(7).fill(false)}}else w.allDayTasks.push({...task,doneDays:Array(7).fill(false)})}
+      else{const i=w.days[dayIdx].tasks.findIndex(x=>x.id===task.id);if(i>=0)w.days[dayIdx].tasks[i]=task;else w.days[dayIdx].tasks.push(task)}
+    })};
+  const deleteTask=(dayIdx,taskId)=>{update(w=>{if(dayIdx===-1)w.allDayTasks=w.allDayTasks.filter(x=>x.id!==taskId);else w.days[dayIdx].tasks=w.days[dayIdx].tasks.filter(x=>x.id!==taskId)})};
+  const moveTask=(fromDay,toDay,taskId)=>{update(w=>{const i=w.days[fromDay].tasks.findIndex(x=>x.id===taskId);if(i>=0){const[task]=w.days[fromDay].tasks.splice(i,1);w.days[toDay].tasks.push(task)}})};
+  const reorder=(dayIdx,taskId,dir)=>{update(w=>{const tasks=w.days[dayIdx].tasks;const i=tasks.findIndex(x=>x.id===taskId);const ni=i+dir;if(ni>=0&&ni<tasks.length)[tasks[i],tasks[ni]]=[tasks[ni],tasks[i]]})};
+  const saveNotes=(dayIdx,notes)=>{update(w=>{w.days[dayIdx].notes=notes})};
+  const saveHeader=()=>{update(w=>{w.title=titleRef.current?.value||w.title;w.note=noteRef.current?.value||w.note;w.startDate=startDateRef.current?.value||w.startDate});setEditHeader(false)};
+
+  // Week navigation
+  const switchWeek=(dir)=>{
+    const order=data.weekOrder;const ci=order.indexOf(data.currentWeekId);const ni=ci+dir;
+    if(ni>=0&&ni<order.length)setData(prev=>({...prev,currentWeekId:order[ni]}));
+  };
+
+  // Stats
+  const dayTasks=week.days.flatMap(d=>d.tasks);
+  const adDone=week.allDayTasks.reduce((s,t)=>s+(t.doneDays||[]).filter(Boolean).length,0);
+  const done=dayTasks.filter(t=>t.done).length+adDone;
+  const total=dayTasks.length+week.allDayTasks.length*7;
+
+  const wi=data.weekOrder.indexOf(data.currentWeekId);
+
+  return(
+    <div>
+      {/* Header */}
+      <div style={{padding:"28px 18px 18px",background:"var(--header-bg)",color:"var(--header-text)"}}>
+        {/* Week nav */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <button onClick={()=>switchWeek(1)} disabled={wi>=data.weekOrder.length-1} style={{background:"none",border:"none",fontSize:20,color:wi>=data.weekOrder.length-1?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.7)",cursor:"pointer"}}>‹</button>
+          {editHeader?(
+            <div style={{flex:1,margin:"0 8px"}}>
+              <input ref={titleRef} defaultValue={week.title} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",fontSize:18,fontWeight:900,marginBottom:4}}/>
+              <input ref={noteRef} defaultValue={week.note} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#cbd5e1",fontSize:12}}/>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.4)",flexShrink:0}}>起始周一</span>
+                <input ref={startDateRef} type="date" defaultValue={week.startDate||""} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#cbd5e1",fontSize:12,flex:1}}/>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button onClick={saveHeader} className="btn-sm" style={{background:"#fff",color:"#1e293b",border:"none"}}>保存</button>
+                <button onClick={()=>setEditHeader(false)} className="btn-sm" style={{background:"rgba(255,255,255,0.15)",color:"#cbd5e1",border:"none"}}>取消</button>
+              </div>
+            </div>
+          ):(
+            <div style={{flex:1,textAlign:"center",cursor:"pointer"}} onClick={()=>setEditHeader(true)}>
+              <div style={{fontSize:20,fontWeight:900,letterSpacing:".04em"}}>{week.title}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",marginTop:2}}>{week.dateRange}</div>
+            </div>
+          )}
+          <button onClick={()=>switchWeek(-1)} disabled={wi<=0} style={{background:"none",border:"none",fontSize:20,color:wi<=0?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.7)",cursor:"pointer"}}>›</button>
+        </div>
+        {week.note&&!editHeader&&<div style={{fontSize:11,color:"rgba(255,255,255,0.4)",padding:"6px 10px",background:"rgba(255,255,255,0.06)",borderRadius:8,textAlign:"center"}}>{week.note}</div>}
+        {/* Progress */}
+        <div style={{marginTop:12,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{flex:1,height:6,background:"rgba(255,255,255,0.1)",borderRadius:999,overflow:"hidden"}}>
+            <div style={{height:"100%",borderRadius:999,transition:"width .4s",width:`${total?(done/total*100):0}%`,background:"linear-gradient(90deg,#34d399,#60a5fa)"}}/>
+          </div>
+          <span style={{fontSize:13,fontWeight:700,fontFamily:"var(--mono)",color:"rgba(255,255,255,0.5)"}}>{done}/{total}</span>
+        </div>
+      </div>
+
+      <div style={{padding:"12px 14px 6px"}}>
+        {/* All-day tasks */}
+        {week.allDayTasks.map(task=>{
+          const dd=task.doneDays||Array(7).fill(false);const dn=dd.filter(Boolean).length;
+          return(
+            <div key={task.id} style={{background:"var(--card)",borderRadius:12,padding:"10px 14px",marginBottom:6,boxShadow:"0 1px 3px rgba(0,0,0,.04)",border:"1.5px dashed var(--border)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <Pill subject={task.subject} subjects={subjects} small/>
+                <span style={{fontSize:13,fontWeight:600,color:dn===7?"var(--text4)":"var(--text2)",flex:1,cursor:"pointer"}} onClick={()=>setEditing({dayIdx:-1,task})}>{task.text}</span>
+                <span style={{fontSize:11,fontWeight:700,color:dn===7?"var(--green)":"var(--text4)",fontFamily:"var(--mono)"}}>{dn}/7</span>
+              </div>
+              <div style={{display:"flex",gap:4,justifyContent:"space-between"}}>
+                {DAYS.map((d,i)=>{const isT=i===todayIdx;const done=dd[i];return(
+                  <button key={i} onClick={()=>toggleDone(-1,task.id,i)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,background:"none",border:"none",cursor:"pointer",padding:"2px 4px"}}>
+                    <span style={{fontSize:10,fontWeight:isT?800:500,color:isT?"var(--blue)":"var(--text4)"}}>{d.slice(1)}</span>
+                    <span style={{width:22,height:22,borderRadius:6,border:`2px solid ${done?"var(--green)":isT?"#93c5fd":"var(--border)"}`,background:done?"var(--green)":"var(--card)",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s",animation:done?"pop .25s ease":"none"}}>
+                      {done&&<span style={{color:"#fff",fontSize:12,fontWeight:700}}>✓</span>}
+                    </span>
+                  </button>
+                )})}
+              </div>
+            </div>
+          )})}
+        <button onClick={()=>setEditing({dayIdx:-1,task:{subject:"全天",doneDays:Array(7).fill(false)}})} style={{display:"flex",alignItems:"center",gap:6,width:"100%",padding:"8px 14px",background:"none",border:"1.5px dashed var(--border)",borderRadius:10,color:"var(--text4)",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+          <span style={{fontSize:16}}>+</span> 添加全天任务
+        </button>
+      </div>
+
+      {/* Days */}
+      <div style={{padding:"6px 14px"}}>
+        {week.days.map((day,dayIdx)=>{
+          const isToday=dayIdx===todayIdx;const exp=expanded[dayIdx];
+          const dd=day.tasks.filter(t=>t.done).length;const dt=day.tasks.length;
+          return(
+            <div key={dayIdx} style={{marginBottom:8,borderRadius:14,overflow:"hidden",background:"var(--card)",
+              boxShadow:isToday?"0 2px 12px rgba(59,130,246,.12)":"0 1px 3px rgba(0,0,0,.04)",
+              border:isToday?"2px solid var(--blue)":`1.5px solid var(--border2)`,transition:"all .2s"}}>
+              <button onClick={()=>setExpanded(p=>({...p,[dayIdx]:!p[dayIdx]}))} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:"none",border:"none",cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {isToday&&<span style={{width:8,height:8,borderRadius:999,background:"var(--blue)",display:"inline-block"}}/>}
+                  <span style={{fontWeight:800,fontSize:15,color:"var(--text)"}}>{day.label}</span>
+                  {dt>0&&<span style={{fontSize:11,fontWeight:700,color:dd===dt?"var(--green)":"var(--text4)",fontFamily:"var(--mono)"}}>{dd}/{dt}</span>}
+                </div>
+                <span style={{fontSize:18,color:"var(--text4)",transform:exp?"rotate(180deg)":"rotate(0)",transition:"transform .2s",display:"inline-block"}}>▾</span>
+              </button>
+              {exp&&(
+                <div style={{padding:"0 14px 12px",animation:"fadeIn .15s ease"}}>
+                  {day.classInfo&&<div style={{fontSize:11,color:"var(--text4)",marginBottom:10,padding:"4px 0",borderBottom:"1px solid var(--border)",fontWeight:500}}>{day.classInfo}</div>}
+                  {day.tasks.map((task,ti)=>(
+                    <div key={task.id} className={deadlineClass(task.deadline,task.done)} style={{display:"flex",gap:8,marginBottom:8,alignItems:"flex-start",padding:"8px 10px",borderRadius:10,background:task.done?"var(--bg)":"var(--card2)",transition:"all .2s"}}>
+                      <button onClick={()=>toggleDone(dayIdx,task.id)} style={{width:22,height:22,borderRadius:6,marginTop:1,
+                        border:`2px solid ${task.done?"var(--green)":(subjects[task.subject]||subjects["全天"]).border}`,
+                        background:task.done?"var(--green)":"var(--card)",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0,
+                        animation:task.done?"pop .25s ease":"none"}}>
+                        {task.done&&<span style={{color:"#fff",fontSize:13,fontWeight:700}}>✓</span>}
+                      </button>
+                      <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setEditing({dayIdx,task})}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                          <Pill subject={task.subject} subjects={subjects} small/>
+                          {task.time&&<span style={{fontSize:11,color:"var(--text4)",fontWeight:600,fontFamily:"var(--mono)"}}>{task.time}</span>}
+                          <DeadlineTag deadline={task.deadline}/>
+                        </div>
+                        <div style={{fontSize:13,color:task.done?"var(--text4)":"var(--text2)",lineHeight:1.5,textDecoration:task.done?"line-through":"none",fontWeight:500}}>{task.text}</div>
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                        {ti>0&&<button onClick={()=>reorder(dayIdx,task.id,-1)} style={{background:"none",border:"none",fontSize:14,color:"var(--text4)",cursor:"pointer",padding:"2px 4px"}}>↑</button>}
+                        {ti<day.tasks.length-1&&<button onClick={()=>reorder(dayIdx,task.id,1)} style={{background:"none",border:"none",fontSize:14,color:"var(--text4)",cursor:"pointer",padding:"2px 4px"}}>↓</button>}
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={()=>setEditing({dayIdx,task:{}})} style={{display:"flex",alignItems:"center",gap:6,width:"100%",padding:"8px 10px",background:"none",border:"1.5px dashed var(--border)",borderRadius:10,color:"var(--text4)",fontSize:12,fontWeight:600,cursor:"pointer",marginTop:2}}>
+                    <span style={{fontSize:16}}>+</span> 添加任务
+                  </button>
+                  {/* Notes */}
+                  <div style={{marginTop:8}}>
+                    <textarea value={day.notes||""} onChange={e=>saveNotes(dayIdx,e.target.value)} placeholder="今日备注..." rows={1}
+                      style={{fontSize:12,padding:"6px 10px",border:"1px solid var(--border)",borderRadius:8,background:"var(--bg)",color:"var(--text3)",resize:"vertical",minHeight:30}}/>
+                  </div>
+                </div>
+              )}
+            </div>
+          )})}
+      </div>
+
+      {editing&&<TaskModal task={editing.task} dayIdx={editing.dayIdx} days={week.days} subjects={subjects}
+        onSave={t=>saveTask(editing.dayIdx,t)} onDelete={id=>deleteTask(editing.dayIdx,id)}
+        onMove={moveTask} onClose={()=>setEditing(null)}/>}
+    </div>
+  );
+}
+
+// ═══ STATS TAB ═══
+function StatsTab({data}){
+  const subjects=data.settings.subjects;
+  const weekStats=data.weekOrder.map(wid=>{
+    const w=data.weeks[wid];const tasks=w.days.flatMap(d=>d.tasks);
+    const adDone=w.allDayTasks.reduce((s,t)=>s+(t.doneDays||[]).filter(Boolean).length,0);
+    const done=tasks.filter(t=>t.done).length+adDone;
+    const total=tasks.length+w.allDayTasks.length*7;
+    // Subject breakdown
+    const bySubject={};tasks.forEach(t=>{if(!bySubject[t.subject])bySubject[t.subject]={done:0,total:0};bySubject[t.subject].total++;if(t.done)bySubject[t.subject].done++});
+    return{id:wid,title:w.title,done,total,rate:total?Math.round(done/total*100):0,bySubject};
+  });
+
+  return(
+    <div style={{padding:"24px 18px"}}>
+      <h2 style={{fontSize:20,fontWeight:900,marginBottom:16,color:"var(--text)"}}>完成率趋势</h2>
+      {weekStats.map(ws=>(
+        <div key={ws.id} style={{marginBottom:16,background:"var(--card)",borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <span style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{ws.title}</span>
+            <span style={{fontWeight:700,fontSize:14,fontFamily:"var(--mono)",color:ws.rate>=70?"var(--green)":ws.rate>=40?"var(--orange)":"var(--red)"}}>{ws.rate}%</span>
+          </div>
+          <div style={{height:8,background:"var(--bg)",borderRadius:999,overflow:"hidden",marginBottom:10}}>
+            <div style={{height:"100%",borderRadius:999,width:`${ws.rate}%`,background:ws.rate>=70?"var(--green)":ws.rate>=40?"var(--orange)":"var(--red)",transition:"width .4s"}}/>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {Object.entries(ws.bySubject).map(([subj,{done:d,total:t}])=>{
+              const c=subjects[subj]||{bg:"#f1f5f9",text:"#475569"};
+              return <span key={subj} style={{fontSize:11,padding:"2px 8px",borderRadius:6,background:c.bg,color:c.text,fontWeight:600}}>{subj} {d}/{t}</span>;
+            })}
+          </div>
+        </div>
+      ))}
+      {weekStats.length===0&&<div style={{color:"var(--text4)",textAlign:"center",padding:40}}>还没有数据</div>}
+    </div>
+  );
+}
+
+// ═══ GOALS TAB ═══
+function GoalsTab({data,setData}){
+  const updateGoalNotes=(i,notes)=>{setData(prev=>{const next={...prev,goals:prev.goals.map((g,j)=>j===i?{...g,notes}:g)};return next})};
+  return(
+    <div style={{padding:"24px 18px"}}>
+      <h2 style={{fontSize:20,fontWeight:900,marginBottom:4,color:"var(--text)"}}>考试目标</h2>
+      <p style={{fontSize:12,color:"var(--text4)",marginBottom:16}}>上外高翻MTI英语口译 · 2026年12月</p>
+      {data.goals.map((g,i)=>(
+        <div key={i} style={{background:"var(--card)",borderRadius:12,padding:"14px 16px",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontWeight:800,fontSize:15,color:"var(--text)"}}>{g.title}</span>
+            <span style={{fontSize:12,fontWeight:700,color:"var(--text4)",fontFamily:"var(--mono)"}}>{g.score}</span>
+          </div>
+          {g.items.map((item,j)=><div key={j} style={{fontSize:12,color:"var(--text3)",lineHeight:1.7,paddingLeft:8,borderLeft:"2px solid var(--border)"}}>• {item}</div>)}
+          <textarea value={g.notes||""} onChange={e=>updateGoalNotes(i,e.target.value)} placeholder="预测方向 / 备注..."
+            rows={1} style={{marginTop:8,fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--text3)",resize:"vertical",minHeight:30}}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══ SETTINGS TAB ═══
+function SettingsTab({data,setData}){
+  const[importMode,setImportMode]=useState(false);
+  const[importText,setImportText]=useState("");
+  const[importScope,setImportScope]=useState("week");
+  const[newSubj,setNewSubj]=useState("");
+  const[editSubj,setEditSubj]=useState(null);
+
+  const PALETTES=[
+    {bg:"#fef3c7",text:"#92400e",border:"#fbbf24"},
+    {bg:"#dbeafe",text:"#1e40af",border:"#60a5fa"},
+    {bg:"#fce7f3",text:"#9d174d",border:"#f472b6"},
+    {bg:"#d1fae5",text:"#065f46",border:"#34d399"},
+    {bg:"#f3e8ff",text:"#6b21a8",border:"#a78bfa"},
+    {bg:"#e0e7ff",text:"#3730a3",border:"#818cf8"},
+    {bg:"#fef2f2",text:"#991b1b",border:"#fca5a5"},
+    {bg:"#ecfdf5",text:"#064e3b",border:"#6ee7b7"},
+    {bg:"#fff7ed",text:"#9a3412",border:"#fdba74"},
+    {bg:"#f0fdf4",text:"#166534",border:"#86efac"},
+  ];
+
+  const toggleDark=()=>{
+    setData(prev=>{const next={...prev,settings:{...prev.settings,darkMode:!prev.settings.darkMode}};return next});
+  };
+
+  const addSubject=()=>{
+    if(!newSubj.trim())return;
+    setData(prev=>({...prev,settings:{...prev.settings,subjects:{...prev.settings.subjects,[newSubj.trim()]:PALETTES[Object.keys(prev.settings.subjects).length%PALETTES.length]}}}));
+    setNewSubj("");
+  };
+
+  const deleteSubject=(name)=>{
+    if(["全天"].includes(name))return;
+    setData(prev=>{const s={...prev.settings.subjects};delete s[name];return{...prev,settings:{...prev.settings,subjects:s}}});
+  };
+
+  const setSubjectColor=(name,palette)=>{
+    setData(prev=>({...prev,settings:{...prev.settings,subjects:{...prev.settings.subjects,[name]:palette}}}));
+    setEditSubj(null);
+  };
+
+  const handleExport=(scope)=>{
+    let obj;
+    if(scope==="all")obj=data;
+    else obj=data.weeks[data.currentWeekId];
+    const json=JSON.stringify(obj,null,2);
+    if(navigator.clipboard)navigator.clipboard.writeText(json).then(()=>alert("已复制！")).catch(()=>prompt("复制JSON：",json));
+    else prompt("复制JSON：",json);
+  };
+
+  const handleImport=()=>{
+    try{
+      const obj=JSON.parse(importText);
+      if(importScope==="all"&&obj.weeks){setData(obj);setImportMode(false);setImportText("");return}
+      if(obj.days&&obj.title){
+        const wid=obj.id||("w"+Date.now().toString(36));obj.id=wid;
+        setData(prev=>{const next={...prev};next.weeks={...next.weeks,[wid]:obj};next.weekOrder=[wid,...next.weekOrder.filter(x=>x!==wid)];next.currentWeekId=wid;return next});
+        setImportMode(false);setImportText("");return;
+      }
+      alert("格式不对");
+    }catch{alert("JSON解析失败")}
+  };
+
+  const addWeek=()=>{
+    const wid="w"+Date.now().toString(36);
+    const blank={id:wid,title:"NEW WEEK",dateRange:"",startDate:"",note:"",allDayTasks:[{id:"ad1",text:"专八词汇",subject:"全天",doneDays:Array(7).fill(false)}],
+      days:DAYS.map((d,i)=>({label:d,classInfo:"",notes:"",tasks:[]}))};
+    setData(prev=>({...prev,weeks:{...prev.weeks,[wid]:blank},weekOrder:[wid,...prev.weekOrder],currentWeekId:wid}));
+  };
+
+  const deleteWeek=()=>{
+    if(data.weekOrder.length<=1){alert("至少保留一周");return}
+    if(!confirm("确定删除当前周？"))return;
+    setData(prev=>{
+      const next={...prev};const wid=next.currentWeekId;
+      const order=next.weekOrder.filter(x=>x!==wid);
+      const weeks={...next.weeks};delete weeks[wid];
+      return{...next,weeks,weekOrder:order,currentWeekId:order[0]};
+    });
+  };
+
+  return(
+    <div style={{padding:"24px 18px"}}>
+      <h2 style={{fontSize:20,fontWeight:900,marginBottom:16,color:"var(--text)"}}>设置</h2>
+
+      {/* Dark mode */}
+      <div style={{background:"var(--card)",borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+        <span style={{fontWeight:600,fontSize:14,color:"var(--text)"}}>深色模式</span>
+        <button onClick={toggleDark} style={{width:50,height:28,borderRadius:14,border:"none",background:data.settings.darkMode?"var(--blue)":"var(--border)",cursor:"pointer",position:"relative",transition:"background .2s"}}>
+          <span style={{position:"absolute",top:3,left:data.settings.darkMode?25:3,width:22,height:22,borderRadius:11,background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
+        </button>
+      </div>
+
+      {/* Subjects */}
+      <div style={{background:"var(--card)",borderRadius:12,padding:"14px 16px",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+        <span style={{fontWeight:700,fontSize:14,color:"var(--text)",display:"block",marginBottom:10}}>科目管理</span>
+        {Object.entries(data.settings.subjects).map(([name,colors])=>(
+          <div key={name} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--border)"}}>
+            <Pill subject={name} subjects={data.settings.subjects}/>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>setEditSubj(editSubj===name?null:name)} className="btn-sm" style={{fontSize:10,padding:"4px 10px"}}>换色</button>
+              {name!=="全天"&&<button onClick={()=>deleteSubject(name)} className="btn-sm btn-danger" style={{fontSize:10,padding:"4px 10px"}}>×</button>}
+            </div>
+            {editSubj===name&&(
+              <div style={{position:"absolute",right:20,marginTop:60,background:"var(--card)",border:"1px solid var(--border)",borderRadius:10,padding:8,display:"flex",flexWrap:"wrap",gap:4,zIndex:10,boxShadow:"0 4px 12px rgba(0,0,0,.1)"}}>
+                {PALETTES.map((p,i)=><button key={i} onClick={()=>setSubjectColor(name,p)} style={{width:24,height:24,borderRadius:6,background:p.bg,border:`2px solid ${p.border}`,cursor:"pointer"}}/>)}
+              </div>
+            )}
+          </div>
+        ))}
+        <div style={{display:"flex",gap:8,marginTop:10}}>
+          <input value={newSubj} onChange={e=>setNewSubj(e.target.value)} placeholder="新科目名" style={{flex:1,fontSize:13}}/>
+          <button onClick={addSubject} className="btn-sm">添加</button>
+        </div>
+      </div>
+
+      {/* Week management */}
+      <div style={{background:"var(--card)",borderRadius:12,padding:"14px 16px",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+        <span style={{fontWeight:700,fontSize:14,color:"var(--text)",display:"block",marginBottom:10}}>周管理</span>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={addWeek} className="btn-sm">+ 新建空白周</button>
+          <button onClick={deleteWeek} className="btn-sm btn-danger">删除当前周</button>
+        </div>
+      </div>
+
+      {/* Import/Export */}
+      <div style={{background:"var(--card)",borderRadius:12,padding:"14px 16px",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+        <span style={{fontWeight:700,fontSize:14,color:"var(--text)",display:"block",marginBottom:10}}>数据</span>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={()=>handleExport("week")} className="btn-sm">导出当前周</button>
+          <button onClick={()=>handleExport("all")} className="btn-sm">导出全部</button>
+          <button onClick={()=>{setImportMode(true);setImportScope("week")}} className="btn-sm">导入周</button>
+          <button onClick={()=>{setImportMode(true);setImportScope("all")}} className="btn-sm">导入全部</button>
+        </div>
+        <div style={{marginTop:8,fontSize:11,color:"var(--text4)"}}>导出当前周JSON → 给Claude → Claude改完 → 导入覆盖</div>
+      </div>
+
+      {/* Reset */}
+      <div style={{textAlign:"center",marginTop:16}}>
+        <button onClick={()=>{if(confirm("确定清除所有数据？"))localStorage.removeItem(STORAGE_KEY),location.reload()}} className="btn-sm btn-danger">清除所有数据</button>
+      </div>
+
+      {importMode&&(
+        <div className="overlay" onClick={()=>setImportMode(false)}>
+          <div className="sheet" onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <span className="sheet-title">导入{importScope==="all"?"全部数据":"周计划"}</span>
+              <button onClick={()=>setImportMode(false)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"var(--text4)"}}>×</button>
+            </div>
+            <textarea value={importText} onChange={e=>setImportText(e.target.value)} placeholder="粘贴JSON..." rows={8} style={{fontFamily:"var(--mono)",fontSize:12,minHeight:120}}/>
+            <button onClick={handleImport} className="btn-primary" style={{marginTop:12}}>导入</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══ MAIN APP ═══
+function App(){
+  const[data,setDataRaw]=useState(loadData);
+  const[tab,setTab]=useState("plan");
+
+  const setData=useCallback((fn)=>{
+    setDataRaw(prev=>{const next=typeof fn==="function"?fn(prev):fn;saveData(next);return next});
+  },[]);
+
+  // Apply dark mode
+  useEffect(()=>{document.documentElement.setAttribute("data-theme",data.settings.darkMode?"dark":"light")},[data.settings.darkMode]);
+
+  return(
+    <div>
+      {tab==="plan"&&<PlanTab data={data} setData={setData}/>}
+      {tab==="stats"&&<StatsTab data={data}/>}
+      {tab==="goals"&&<GoalsTab data={data} setData={setData}/>}
+      {tab==="settings"&&<SettingsTab data={data} setData={setData}/>}
+
+      <div className="tab-bar">
+        {[["plan","📋","计划"],["stats","📊","统计"],["goals","🎯","目标"],["settings","⚙","设置"]].map(([id,icon,label])=>(
+          <button key={id} className={`tab-btn${tab===id?" active":""}`} onClick={()=>setTab(id)}>
+            <span className="tab-icon">{icon}</span>{label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
